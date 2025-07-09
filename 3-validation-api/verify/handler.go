@@ -4,7 +4,9 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"github.com/jordan-wright/email"
 	"net/http"
+	"net/smtp"
 	"time"
 )
 
@@ -32,18 +34,16 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	verificationStorage[hash] = req.To
 
-	/*
-		e := email.NewEmail()
-		e.From = "from@example.com"
-		e.To = []string{req.To}
-		e.Subject = "Подтверждение email"
-		e.Text = []byte(fmt.Sprintf("Для подтверждения email перейдите по ссылке: http://example.com/verify/%s", hash))
-		err := e.Send("smtp.example.com:587", smtp.PlainAuth("", "username", "password", "smtp.example.com"))
-		if err != nil {
-			http.Error(w, "Ошибка отправки email", http.StatusInternalServerError)
-			return
-		}
-	*/
+	e := email.NewEmail()
+	e.From = "from@example.com"
+	e.To = []string{req.To}
+	e.Subject = "Подтверждение email"
+	e.Text = []byte(fmt.Sprintf("Для подтверждения email перейдите по ссылке: http://example.com/verify/%s", hash))
+	err := e.Send("smtp.example.com:587", smtp.PlainAuth("", "username", "password", "smtp.example.com"))
+	if err != nil {
+		http.Error(w, "Ошибка отправки email", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
