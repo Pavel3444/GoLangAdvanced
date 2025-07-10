@@ -1,7 +1,8 @@
 package verify
 
 import (
-	"crypto/md5"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/jordan-wright/email"
@@ -9,10 +10,10 @@ import (
 	"net/http"
 	"net/smtp"
 	"strings"
-	"time"
+	"sync"
 )
 
-var verificationStorage = make(map[string]string)
+var verificationStorage = sync.Map{}
 
 type SendRequest struct {
 	To string `json:"to"`
@@ -33,10 +34,9 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	cfg := config.Load()
 
-	data := req.To + time.Now().String()
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(data)))
+	hash := generateToken(32)
 
-	verificationStorage[hash] = req.To
+	verificationStorage.Store(hash, req.To)
 
 	e := email.NewEmail()
 	e.From = cfg.Email
@@ -58,12 +58,13 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
-	email, exists := verificationStorage[hash]
-
+	value, exists := verificationStorage.Load(hash)
 	if !exists {
 		http.Error(w, "Неверный код подтверждения", http.StatusNotFound)
 		return
 	}
+
+	email := value.(string)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -72,7 +73,7 @@ func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
 		"email":  email,
 	})
 
-	delete(verificationStorage, hash)
+	verificationStorage.Delete(hash)
 }
 
 func extractHost(addr string) string {
@@ -81,4 +82,13 @@ func extractHost(addr string) string {
 		return parts[0]
 	}
 	return addr
+}
+
+func generateToken(length int) string {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(bytes)
 }
