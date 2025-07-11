@@ -1,9 +1,9 @@
 package main
 
 import (
+	"3-validation-api/verify"
 	"github.com/joho/godotenv"
 	"log"
-	"main/verify"
 	"net/http"
 )
 

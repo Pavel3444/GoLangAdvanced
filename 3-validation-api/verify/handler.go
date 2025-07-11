@@ -1,12 +1,12 @@
 package verify
 
 import (
+	"3-validation-api/config"
+	"3-validation-api/pkg"
 	"encoding/json"
 	"fmt"
 	"github.com/jordan-wright/email"
 	"log"
-	"main/config"
-	"main/pkg"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -18,6 +18,9 @@ var mu sync.Mutex
 const verificationFile = "verification.json"
 
 func loadVerificationMap() map[string]string {
+	mu.Lock()
+	defer mu.Unlock()
+
 	data := make(map[string]string)
 	file, err := os.ReadFile(verificationFile)
 	if err != nil {
@@ -28,6 +31,9 @@ func loadVerificationMap() map[string]string {
 }
 
 func saveVerificationMap(data map[string]string) {
+	mu.Lock()
+	defer mu.Unlock()
+
 	file, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		log.Printf("ошибка сериализации verification map: %v", err)
@@ -54,11 +60,9 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	hash := pkg.GenerateToken(32)
 
-	mu.Lock()
 	data := loadVerificationMap()
 	data[hash] = req.Email
 	saveVerificationMap(data)
-	mu.Unlock()
 
 	e := email.NewEmail()
 	e.From = cfg.Email
@@ -84,14 +88,12 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
 	w.Header().Set("Content-Type", "application/json")
 
-	mu.Lock()
 	data := loadVerificationMap()
 	email, exists := data[hash]
 	if exists {
 		delete(data, hash)
 		saveVerificationMap(data)
 	}
-	mu.Unlock()
 
 	if !exists {
 		json.NewEncoder(w).Encode(map[string]bool{

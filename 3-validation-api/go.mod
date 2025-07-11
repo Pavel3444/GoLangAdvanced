@@ -1,4 +1,4 @@
-module main
+module 3-validation-api
 
 go 1.24.1
 
