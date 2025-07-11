@@ -15,8 +15,8 @@ func main() {
 
 	verify.SetupRoutes()
 
-	log.Println("Сервер запущен на :8080")
-	err = http.ListenAndServe(":8080", nil)
+	log.Println("Сервер запущен на :8081")
+	err = http.ListenAndServe(":8081", nil)
 	if err != nil {
 		log.Fatal("Ошибка запуска сервера:", err)
 	}

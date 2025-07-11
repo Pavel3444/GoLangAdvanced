@@ -25,9 +25,7 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 	hash := pkg.GenerateToken(32)
 	verificationStorage.Store(hash, req.Email)
 	e := email.NewEmail()
-	//e.From = cfg.Email
-	//TODO: example for test
-	e.From = "from@example.com"
+	e.From = cfg.Email
 	e.To = []string{req.Email}
 	e.Subject = "Подтверждение email"
 	link := fmt.Sprintf("%s://%s/verify/%s", pkg.GetScheme(r), r.Host, hash)
@@ -58,10 +56,7 @@ func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
 		return
 	}
 
-	// Удаляем, как требует ТЗ
 	verificationStorage.Delete(hash)
-
-	// Возвращаем JSON с verified: true и email (если нужно)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"verified": true,
 		"email":    value,
