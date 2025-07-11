@@ -1,50 +1,40 @@
 package verify
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/jordan-wright/email"
+	"log"
 	"main/config"
+	"main/pkg"
 	"net/http"
 	"net/smtp"
-	"strings"
 	"sync"
 )
 
 var verificationStorage = sync.Map{}
 
-type SendRequest struct {
-	To string `json:"to"`
-}
-
 func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
-	var req SendRequest
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&req); err != nil {
-		http.Error(w, "Неверный формат запроса", http.StatusBadRequest)
-		return
-	}
-
-	if req.To == "" {
-		http.Error(w, "Email адрес не указан", http.StatusBadRequest)
+	req, err := pkg.ParseAndValidateSendRequest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	cfg := config.Load()
-
-	hash := generateToken(32)
-
-	verificationStorage.Store(hash, req.To)
-
+	hash := pkg.GenerateToken(32)
+	verificationStorage.Store(hash, req.Email)
 	e := email.NewEmail()
-	e.From = cfg.Email
-	e.To = []string{req.To}
+	//e.From = cfg.Email
+	//TODO: example for test
+	e.From = "from@example.com"
+	e.To = []string{req.Email}
 	e.Subject = "Подтверждение email"
-	e.Text = []byte(fmt.Sprintf("Для подтверждения email перейдите по ссылке: http://example.com/verify/%s", hash))
-	err := e.Send(cfg.Address, smtp.PlainAuth("", cfg.Email, cfg.Password, extractHost(cfg.Address)))
+	link := fmt.Sprintf("%s://%s/verify/%s", pkg.GetScheme(r), r.Host, hash)
+	e.Text = []byte(fmt.Sprintf("Для подтверждения email перейдите по ссылке: %s", link))
+	err = e.Send(cfg.Address, smtp.PlainAuth("", cfg.Email, cfg.Password, pkg.ExtractHost(cfg.Address)))
 	if err != nil {
+		log.Printf("ошибка отправки письма: %v", err)
 		http.Error(w, "Ошибка отправки email", http.StatusInternalServerError)
 		return
 	}
@@ -58,37 +48,22 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
+	w.Header().Set("Content-Type", "application/json")
+
 	value, exists := verificationStorage.Load(hash)
 	if !exists {
-		http.Error(w, "Неверный код подтверждения", http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]bool{
+			"verified": false,
+		})
 		return
 	}
 
-	email := value.(string)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "success",
-		"email":  email,
-	})
-
+	// Удаляем, как требует ТЗ
 	verificationStorage.Delete(hash)
-}
 
-func extractHost(addr string) string {
-	parts := strings.Split(addr, ":")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return addr
-}
-
-func generateToken(length int) string {
-	bytes := make([]byte, length)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return ""
-	}
-	return hex.EncodeToString(bytes)
+	// Возвращаем JSON с verified: true и email (если нужно)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"verified": true,
+		"email":    value,
+	})
 }
