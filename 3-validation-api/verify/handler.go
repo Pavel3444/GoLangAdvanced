@@ -9,10 +9,34 @@ import (
 	"main/pkg"
 	"net/http"
 	"net/smtp"
+	"os"
 	"sync"
 )
 
-var verificationStorage = sync.Map{}
+var mu sync.Mutex
+
+const verificationFile = "verification.json"
+
+func loadVerificationMap() map[string]string {
+	mu.Lock()
+	defer mu.Unlock()
+
+	data := make(map[string]string)
+	file, err := os.ReadFile(verificationFile)
+	if err != nil {
+		return data
+	}
+	_ = json.Unmarshal(file, &data)
+	return data
+}
+
+func saveVerificationMap(data map[string]string) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	file, _ := json.MarshalIndent(data, "", "  ")
+	_ = os.WriteFile(verificationFile, file, 0644)
+}
 
 func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := pkg.ParseAndValidateSendRequest(r)
@@ -22,10 +46,19 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := config.Load()
+	if cfg == nil {
+		log.Fatal("SMTP config is incomplete or missing; application cannot proceed.")
+	}
+
 	hash := pkg.GenerateToken(32)
-	verificationStorage.Store(hash, req.Email)
+
+	data := loadVerificationMap()
+	data[hash] = req.Email
+	saveVerificationMap(data)
+
 	e := email.NewEmail()
-	e.From = cfg.Email
+	//e.From = cfg.Email
+	e.From = "qwe@qwe.qwe"
 	e.To = []string{req.Email}
 	e.Subject = "Подтверждение email"
 	link := fmt.Sprintf("%s://%s/verify/%s", pkg.GetScheme(r), r.Host, hash)
@@ -48,7 +81,8 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
 	w.Header().Set("Content-Type", "application/json")
 
-	value, exists := verificationStorage.Load(hash)
+	data := loadVerificationMap()
+	email, exists := data[hash]
 	if !exists {
 		json.NewEncoder(w).Encode(map[string]bool{
 			"verified": false,
@@ -56,9 +90,11 @@ func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
 		return
 	}
 
-	verificationStorage.Delete(hash)
+	delete(data, hash)
+	saveVerificationMap(data)
+
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"verified": true,
-		"email":    value,
+		"email":    email,
 	})
 }

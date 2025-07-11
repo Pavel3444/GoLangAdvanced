@@ -12,10 +12,18 @@ type Config struct {
 }
 
 func Load() *Config {
+	address := ensureSMTPPort(os.Getenv("SMTP_ADDRESS"))
+	email := os.Getenv("SMTP_EMAIL")
+	password := os.Getenv("SMTP_PASSWORD")
+
+	if address == "" || email == "" || password == "" {
+		return nil
+	}
+
 	return &Config{
-		Address:  ensureSMTPPort(os.Getenv("SMTP_ADDRESS")),
-		Email:    os.Getenv("SMTP_EMAIL"),
-		Password: os.Getenv("SMTP_PASSWORD"),
+		Address:  address,
+		Email:    email,
+		Password: password,
 	}
 }
 
