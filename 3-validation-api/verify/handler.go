@@ -18,9 +18,6 @@ var mu sync.Mutex
 const verificationFile = "verification.json"
 
 func loadVerificationMap() map[string]string {
-	mu.Lock()
-	defer mu.Unlock()
-
 	data := make(map[string]string)
 	file, err := os.ReadFile(verificationFile)
 	if err != nil {
@@ -31,11 +28,16 @@ func loadVerificationMap() map[string]string {
 }
 
 func saveVerificationMap(data map[string]string) {
-	mu.Lock()
-	defer mu.Unlock()
+	file, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		log.Printf("ошибка сериализации verification map: %v", err)
+		return
+	}
 
-	file, _ := json.MarshalIndent(data, "", "  ")
-	_ = os.WriteFile(verificationFile, file, 0644)
+	err = os.WriteFile(verificationFile, file, 0644)
+	if err != nil {
+		log.Printf("ошибка записи verification файла: %v", err)
+	}
 }
 
 func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
@@ -52,13 +54,14 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	hash := pkg.GenerateToken(32)
 
+	mu.Lock()
 	data := loadVerificationMap()
 	data[hash] = req.Email
 	saveVerificationMap(data)
+	mu.Unlock()
 
 	e := email.NewEmail()
-	//e.From = cfg.Email
-	e.From = "qwe@qwe.qwe"
+	e.From = cfg.Email
 	e.To = []string{req.Email}
 	e.Subject = "Подтверждение email"
 	link := fmt.Sprintf("%s://%s/verify/%s", pkg.GetScheme(r), r.Host, hash)
@@ -81,17 +84,21 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 func VerifyHandler(w http.ResponseWriter, r *http.Request, hash string) {
 	w.Header().Set("Content-Type", "application/json")
 
+	mu.Lock()
 	data := loadVerificationMap()
 	email, exists := data[hash]
+	if exists {
+		delete(data, hash)
+		saveVerificationMap(data)
+	}
+	mu.Unlock()
+
 	if !exists {
 		json.NewEncoder(w).Encode(map[string]bool{
 			"verified": false,
 		})
 		return
 	}
-
-	delete(data, hash)
-	saveVerificationMap(data)
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"verified": true,
