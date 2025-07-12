@@ -56,7 +56,6 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 	cfg := config.Load()
 	if cfg == nil {
 		http.Error(w, "SMTP конфигурация отсутствует или неполна", http.StatusInternalServerError)
-		log.Fatal("SMTP config is incomplete or missing; application cannot proceed.")
 		return
 	}
 
