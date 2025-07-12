@@ -2,7 +2,7 @@ package verify
 
 import (
 	"3-validation-api/config"
-	"3-validation-api/pkg"
+	"3-validation-api/pkg/verify"
 	"encoding/json"
 	"fmt"
 	"github.com/jordan-wright/email"
@@ -47,7 +47,7 @@ func saveVerificationMap(data map[string]string) {
 }
 
 func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
-	req, err := pkg.ParseAndValidateSendRequest(r)
+	req, err := verify.ParseAndValidateSendRequest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -59,7 +59,7 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash := pkg.GenerateToken(32)
+	hash := verify.GenerateToken(32)
 
 	data := loadVerificationMap()
 	data[hash] = req.Email
@@ -69,9 +69,9 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 	e.From = cfg.Email
 	e.To = []string{req.Email}
 	e.Subject = "Подтверждение email"
-	link := fmt.Sprintf("%s://%s/verify/%s", pkg.GetScheme(r), r.Host, hash)
+	link := fmt.Sprintf("%s://%s/verify/%s", verify.GetScheme(r), r.Host, hash)
 	e.Text = []byte(fmt.Sprintf("Для подтверждения email перейдите по ссылке: %s", link))
-	err = e.Send(cfg.Address, smtp.PlainAuth("", cfg.Email, cfg.Password, pkg.ExtractHost(cfg.Address)))
+	err = e.Send(cfg.Address, smtp.PlainAuth("", cfg.Email, cfg.Password, verify.ExtractHost(cfg.Address)))
 	if err != nil {
 		log.Printf("ошибка отправки письма: %v", err)
 		http.Error(w, "Ошибка отправки email", http.StatusInternalServerError)

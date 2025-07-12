@@ -1,4 +1,4 @@
-package pkg
+package verify
 
 import (
 	"crypto/rand"
