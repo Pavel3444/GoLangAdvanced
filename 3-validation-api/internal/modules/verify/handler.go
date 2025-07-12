@@ -55,8 +55,10 @@ func SendEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	cfg := config.Load()
 	if cfg == nil {
-		http.Error(w, "SMTP конфигурация отсутствует или неполна", http.StatusInternalServerError)
+		log.Printf("SMTP конфигурация отсутствует - функционал отправки email недоступен")
+		http.Error(w, "Сервис отправки email временно недоступен", http.StatusServiceUnavailable)
 		return
+
 	}
 
 	hash := verify.GenerateToken(32)
