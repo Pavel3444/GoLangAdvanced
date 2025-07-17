@@ -19,7 +19,7 @@ func main() {
 		}
 	})
 	server := http.Server{
-		Addr:    ":8080",
+		Addr:    ":8081",
 		Handler: router,
 	}
 	log.Printf("Сервер запущен на http://localhost%s", server.Addr)
