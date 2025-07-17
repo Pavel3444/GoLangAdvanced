@@ -11,6 +11,9 @@ func main() {
 	conf := config.LoadConfig()
 	dataBase := db.NewDb(*conf)
 
-	migrations.InitialMigration()
-	fmt.Println(dataBase)
+	if err := migrations.InitialMigration(dataBase); err != nil {
+		fmt.Printf("❌ Failed to run migrations: %v\n", err)
+		return
+	}
+	fmt.Println("✅ Database connection established")
 }
