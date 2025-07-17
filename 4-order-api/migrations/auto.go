@@ -1,4 +1,4 @@
-package main
+package migrations
 
 import (
 	"4-order-api/internal/product"
@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func main() {
+func InitialMigration() {
 	err := godotenv.Load(".env")
 	if err != nil {
 		panic(err)
